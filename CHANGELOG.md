@@ -5,6 +5,23 @@ All notable changes to the Network Diagnostics Tool will be documented in this f
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.4.0] - 2024-05-27
+
+### Added
+- NOC contact information extraction from whois data
+- PeeringDB suggestion when NOC contacts aren't found
+- More aggressive peer ASN extraction for better identification
+
+### Changed
+- Improved display of contact information to prioritize NOC contacts
+- Enhanced peer identification in BGPlay API output
+- Better handling of unknown ASNs in looking glass data
+
+### Fixed
+- Fixed "Unknown ASN" issues in looking glass API output
+- Fixed "Unknown peer" issues in BGPlay API output
+- Improved email extraction from whois data
+
 ## [1.0.0] - 2023-06-20
 
 ### Added

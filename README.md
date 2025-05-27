@@ -26,6 +26,7 @@ Queries several authoritative BGP data sources:
   - BGPlay API for historical routing changes
   - AS Overview API for ASN details
   - AS Routing Consistency API for RIB visibility analysis
+- Whois services for detailed contact information, including NOC contacts
 - NLNOG Ring looking glass for distributed network diagnostics
 - Cross-references information between sources for reliability
 
@@ -199,6 +200,17 @@ AS Overview Information:
   - Resource: AS15169
   - Block: AS15169 - AS15169
 
+Contact Information:
+  - Organization: Google LLC
+  - Address:
+    1600 Amphitheatre Parkway
+    Mountain View
+    CA 94043
+  - NOC Email: noc@google.com
+  - NOC Phone: +1-650-253-0000
+  - Abuse Email: abuse@google.com
+  - Admin Email: dns-admin@google.com
+
 For more details, visit: https://stat.ripe.net/AS15169
 
   - RIB Visibility Analysis:
@@ -310,6 +322,30 @@ The tool will:
 - Use the appropriate IPv6 whois services
 - Adjust ping commands for IPv6 compatibility
 - Provide IPv6-specific routing information
+
+### Network Operator Contact Information
+
+The tool extracts and displays comprehensive contact information for network operators:
+
+```
+Contact Information:
+  - Organization: Google LLC
+  - Address:
+    1600 Amphitheatre Parkway
+    Mountain View
+    CA 94043
+  - NOC Email: noc@google.com
+  - NOC Phone: +1-650-253-0000
+  - Abuse Email: abuse@google.com
+  - Admin Email: dns-admin@google.com
+```
+
+This information is prioritized to show the most operationally relevant contacts first:
+1. NOC (Network Operations Center) contacts - critical for urgent operational issues
+2. Abuse contacts - for reporting abuse or security issues
+3. Administrative and technical contacts - for general inquiries
+
+If NOC contact information isn't found in whois data, the tool suggests checking PeeringDB for additional contact details.
 
 ### RIB Visibility Analysis
 

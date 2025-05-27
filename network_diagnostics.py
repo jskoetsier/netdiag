@@ -548,9 +548,11 @@ class NetworkDiagnostics:
             'admin_email': None,
             'tech_email': None,
             'abuse_email': None,
+            'noc_email': None,
             'organization': None,
             'address': [],
-            'phone': None
+            'phone': None,
+            'noc_phone': None
         }
 
         try:
@@ -582,23 +584,41 @@ class NetworkDiagnostics:
                     if address_matches:
                         contact_info['address'] = [addr.strip() for addr in address_matches]
 
-                # Extract phone
+                # Extract phone numbers
                 phone_match = re.search(r'Phone:\s*(.*)', stdout)
                 if phone_match:
                     contact_info['phone'] = phone_match.group(1).strip()
 
+                # Look for NOC phone specifically
+                noc_phone_match = re.search(r'NOC Phone:\s*(.*)', stdout, re.IGNORECASE) or re.search(r'noc-phone:\s*(.*)', stdout, re.IGNORECASE)
+                if noc_phone_match:
+                    contact_info['noc_phone'] = noc_phone_match.group(1).strip()
+
                 # Extract emails
-                admin_email_match = re.search(r'Admin Email:\s*(.*)', stdout, re.IGNORECASE)
+                admin_email_match = re.search(r'Admin Email:\s*(.*)', stdout, re.IGNORECASE) or re.search(r'admin-c:\s*(.*@.*)', stdout, re.IGNORECASE)
                 if admin_email_match:
                     contact_info['admin_email'] = admin_email_match.group(1).strip()
 
-                tech_email_match = re.search(r'Tech Email:\s*(.*)', stdout, re.IGNORECASE)
+                tech_email_match = re.search(r'Tech Email:\s*(.*)', stdout, re.IGNORECASE) or re.search(r'tech-c:\s*(.*@.*)', stdout, re.IGNORECASE)
                 if tech_email_match:
                     contact_info['tech_email'] = tech_email_match.group(1).strip()
 
-                abuse_email_match = re.search(r'Abuse Email:\s*(.*)', stdout, re.IGNORECASE) or re.search(r'abuse-mailbox:\s*(.*)', stdout, re.IGNORECASE)
+                abuse_email_match = re.search(r'Abuse Email:\s*(.*)', stdout, re.IGNORECASE) or re.search(r'abuse-mailbox:\s*(.*)', stdout, re.IGNORECASE) or re.search(r'abuse-c:\s*(.*@.*)', stdout, re.IGNORECASE)
                 if abuse_email_match:
                     contact_info['abuse_email'] = abuse_email_match.group(1).strip()
+
+                # Look for NOC email specifically
+                noc_email_match = re.search(r'NOC Email:\s*(.*)', stdout, re.IGNORECASE) or re.search(r'noc-mailbox:\s*(.*)', stdout, re.IGNORECASE) or re.search(r'noc@', stdout, re.IGNORECASE)
+                if noc_email_match:
+                    if isinstance(noc_email_match, re.Match):
+                        contact_info['noc_email'] = noc_email_match.group(1).strip() if noc_email_match.groups() else None
+                    else:
+                        # If we found noc@ in the text, try to extract the full email
+                        noc_emails = re.findall(r'[\w\.-]+@[\w\.-]+\.\w+', stdout)
+                        for email in noc_emails:
+                            if 'noc@' in email.lower():
+                                contact_info['noc_email'] = email
+                                break
 
                 # If no specific emails found, look for any email
                 if not (contact_info['admin_email'] or contact_info['tech_email'] or contact_info['abuse_email']):
@@ -684,17 +704,29 @@ class NetworkDiagnostics:
                             for addr in contact_info['address'][:3]:  # Show up to 3 address lines
                                 self._add_to_report(f"    {addr}")
 
-                        if contact_info['phone']:
-                            self._add_to_report(f"  - Phone: {contact_info['phone']}")
+                        # Display NOC contact information first (most important for network operations)
+                        if contact_info['noc_email']:
+                            self._add_to_report(f"  - NOC Email: {contact_info['noc_email']}")
 
-                        if contact_info['abuse_email']:
+                        if contact_info['noc_phone']:
+                            self._add_to_report(f"  - NOC Phone: {contact_info['noc_phone']}")
+
+                        # Then display other contact information
+                        if contact_info['phone'] and contact_info['phone'] != contact_info['noc_phone']:
+                            self._add_to_report(f"  - General Phone: {contact_info['phone']}")
+
+                        if contact_info['abuse_email'] and contact_info['abuse_email'] != contact_info['noc_email']:
                             self._add_to_report(f"  - Abuse Email: {contact_info['abuse_email']}")
 
-                        if contact_info['admin_email'] and contact_info['admin_email'] != contact_info['abuse_email']:
+                        if contact_info['admin_email'] and contact_info['admin_email'] != contact_info['noc_email'] and contact_info['admin_email'] != contact_info['abuse_email']:
                             self._add_to_report(f"  - Admin Email: {contact_info['admin_email']}")
 
-                        if contact_info['tech_email'] and contact_info['tech_email'] != contact_info['admin_email'] and contact_info['tech_email'] != contact_info['abuse_email']:
+                        if contact_info['tech_email'] and contact_info['tech_email'] != contact_info['noc_email'] and contact_info['tech_email'] != contact_info['admin_email'] and contact_info['tech_email'] != contact_info['abuse_email']:
                             self._add_to_report(f"  - Tech Email: {contact_info['tech_email']}")
+
+                        # If no NOC contact was found, suggest checking PeeringDB
+                        if not (contact_info['noc_email'] or contact_info['noc_phone']):
+                            self._add_to_report(f"  - Note: No NOC contact found. Check PeeringDB: https://www.peeringdb.com/asn/{self.asn}")
 
                     # Provide link to AS Overview in RIPE Stat
                     self._add_to_report(f"\nFor more details, visit: https://stat.ripe.net/AS{self.asn}")
@@ -857,11 +889,34 @@ class NetworkDiagnostics:
                                 timestamp = event.get("timestamp", "Unknown")
                                 peer = event.get("peer", "Unknown")
 
-                                # Format the peer ASN correctly
+                                # More aggressive approach to extract peer ASN information
                                 if peer and peer != "Unknown":
                                     peer_str = f"AS{peer}"
                                 else:
-                                    peer_str = "Unknown peer"
+                                    # Try to extract from path if available
+                                    if "path" in event and event["path"]:
+                                        path = event["path"]
+                                        if path:
+                                            # Use the first ASN in the path as the peer
+                                            peer_str = f"AS{path[0]}"
+                                        else:
+                                            peer_str = "Peer unavailable"
+                                    else:
+                                        # Try to extract from other fields
+                                        peer_found = False
+                                        for key, value in event.items():
+                                            if isinstance(value, (int, str)) and str(value).isdigit():
+                                                try:
+                                                    asn_int = int(value)
+                                                    if 1 <= asn_int <= 4200000000:  # Valid ASN range
+                                                        peer_str = f"AS{value}"
+                                                        peer_found = True
+                                                        break
+                                                except:
+                                                    pass
+
+                                        if not peer_found:
+                                            peer_str = "Peer unavailable"
 
                                 # Convert timestamp to readable format
                                 try:
