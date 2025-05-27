@@ -71,125 +71,187 @@ Generates direct links to detailed reports for further analysis:
 The easiest way to run the tool is using the provided shell script:
 
 ```
-./run_diagnostics.sh TARGET [--period PERIOD]
+./run_diagnostics.sh TARGET [--period PERIOD] [--ipv6] [--current] [--output FILE]
 ```
 
 Where:
 - `TARGET` is an IP address or hostname you want to diagnose
-- `PERIOD` (optional) is the time period for MRT data analysis (24h, 2d, 5d, 7d)
+- `--period PERIOD` (optional) is the time period for historical analysis (24h, 2d, 5d, 7d)
+- `--ipv6` (optional) forces IPv6 resolution for hostnames
+- `--current` (optional) shows actual route visibility in the global routing table
+- `--output FILE` (optional) specifies a custom output file (default: AS{number}.txt)
 
 Examples:
 ```
+# Basic usage
 ./run_diagnostics.sh example.com
+
+# Analyze 7 days of routing history
 ./run_diagnostics.sh 8.8.8.8 --period 7d
+
+# Show current route visibility
+./run_diagnostics.sh 8.8.8.8 --current
+
+# Force IPv6 resolution
+./run_diagnostics.sh google.com --ipv6
+
+# Specify custom output file
+./run_diagnostics.sh 8.8.8.8 --output google-report.txt
 ```
 
 The shell script will:
 - Check for Python and pip installation
 - Install required dependencies
 - Make the Python script executable
-- Run the network diagnostics tool with your specified target
+- Run the network diagnostics tool with your specified options
+- Automatically save the report to AS{number}.txt unless specified otherwise
 
 ### Direct Python Usage
 
 You can also run the Python script directly:
 
 ```
-./network_diagnostics.py TARGET [--period PERIOD]
+./network_diagnostics.py TARGET [--period PERIOD] [--ipv6] [--current] [--output FILE]
 ```
 
 Examples:
 ```
 ./network_diagnostics.py 8.8.8.8
-./network_diagnostics.py example.com --period 5d
+./network_diagnostics.py example.com --period 5d --current
+./network_diagnostics.py 2001:4860:4860::8888 --ipv6
 ```
 
 ## Example Output
 
 ```
-Network Diagnostics for 8.8.8.8
-==================================================
+Network Diagnostics Report for 8.8.8.8
+======================================================================
+Generated on: 2023-06-20 15:30:45
+Time period: 24h (1 days)
 
-[+] Getting prefix information for 8.8.8.8...
-Team Cymru reports IP 8.8.8.8 belongs to:
-  - Prefix: 8.8.8.0/24
-  - ASN: 15169
+1. Network Information
+----------------------------------------------------------------------
+IP: 8.8.8.8
+Prefix: 8.8.8.0/24
+ASN: AS15169 (GOOGLE)
+Country: US
+
+2. Reachability
+----------------------------------------------------------------------
+Checking reachability for 8.8.8.8...
+Host is reachable
+Ping statistics: min=8.123ms, avg=9.456ms, max=10.789ms
+Packet loss: 0%
+
+3. Global Routing Table Visibility
+----------------------------------------------------------------------
+Checking global routing visibility for 8.8.8.0/24 over the last 1 days...
+
+Prefix 8.8.8.0/24 is announced by:
+  - ASN: AS15169
+  - Network: GOOGLE
   - Country: US
-  - ASN Name: GOOGLE - Google LLC
 
-[+] Querying bgp.tools for routing information...
-Error: bgp.tools API returned status code 501
+Current and Historical Routing Information:
+Analyzing routing data for the period: 2023-06-19 to 2023-06-20
 
-[+] Querying BGPView for routing information...
-BGPView reports IP 8.8.8.8 belongs to:
-  - Prefix: 8.8.8.0/24
-  - ASN: 15169
-  - Name: GOOGLE
-  - Description: Google LLC
+Routing changes analysis:
+To check for routing changes over the last 1 days, use these resources:
 
-[+] Querying NLNOG Ring for routing information...
-NLNOG Ring provides a distributed looking glass with nodes around the world.
-You can use it to run network diagnostics from multiple locations.
+1. NLNOG Ring looking glass (current routing state):
+   - Visit: https://lg.ring.nlnog.net/
+   - Select different nodes to get diverse perspectives
+   - For your prefix 8.8.8.0/24, use command: 'show ip bgp 8.8.8.0/24'
 
-For your prefix 8.8.8.0/24, you can:
-1. Visit https://lg.ring.nlnog.net/
-2. Select a node from the dropdown (e.g., 'xs4all01' in Netherlands)
-3. Choose 'BGP' from the command dropdown
-4. Enter 'route 8.8.8.0/24' in the arguments field
-5. Click 'Run command' to see BGP route information
+2. RIPE Stat API Analysis:
+   Querying RIPE Stat API for routing information...
 
-[+] Analyzing RIS MRT data for the last 24h (1 days)...
-RIPE NCC's Routing Information Service (RIS) collects and stores BGP routing information
-in MRT format, which can be used for detailed route change analysis.
+Querying RIPE Stat BGPlay API for routing changes...
+Analyzing routing changes from 2023-06-19 to 2023-06-20...
 
-Note: Using data from 2023-06-16 to 2023-06-16
+Found 12 routing events for 8.8.8.0/24:
 
-[+] MRT Analysis Report for 8.8.8.0/24:
-============================================================
+Event type summary:
+  - A: 10 events
+  - W: 2 events
 
-Date: 2023-06-16
-------------------------------------------------------------
+Sample events:
+  - 2023-06-19 08:15:23: A event from AS34224
+  - 2023-06-19 12:42:17: A event from AS6939
+  - 2023-06-19 15:30:05: W event from AS6939
+  - 2023-06-19 18:22:41: A event from AS6939
+  - 2023-06-20 02:15:18: A event from AS34224
 
-Collector: rrc00
-Source: https://data.ris.ripe.net/rrc00/2023.06/rrc00.20230616.0000.gz
-File size: 65.42 MB
-File is large. Providing metadata only.
-To analyze this file, you would need to:
-1. Download: wget https://data.ris.ripe.net/rrc00/2023.06/rrc00.20230616.0000.gz
-2. Install a tool like bgpdump or mrtparse
-3. Process with: bgpdump -M downloaded_file.gz | grep 8.8.8.0/24
+... and 7 more events
 
-Collector: rrc01
-Source: https://data.ris.ripe.net/rrc01/2023.06/rrc01.20230616.0000.gz
-File size: 42.18 MB
-File is large. Providing metadata only.
-To analyze this file, you would need to:
-1. Download: wget https://data.ris.ripe.net/rrc01/2023.06/rrc01.20230616.0000.gz
-2. Install a tool like bgpdump or mrtparse
-3. Process with: bgpdump -M downloaded_file.gz | grep 8.8.8.0/24
+Routing stability analysis:
+  - Announcements: 10
+  - Withdrawals: 2
+  - Events per day: 12.0
+  - Assessment: High routing activity detected
+    This could indicate route flapping or instability
 
-Alternative data sources for 2023-06-16:
-- RouteViews Archive: https://archive.routeviews.org/bgpdata/2023.06/RIBS/
-- PCH Route Server Data: https://www.pch.net/resources/Routing_Data/
-- CAIDA BGP Data: https://www.caida.org/catalog/datasets/routeviews-prefix2as/
+No changes in announcing ASNs during this period
 
-[+] Links to BGP and routing information resources:
+AS Overview Information:
+  - AS15169 Holder: GOOGLE
+  - Announced Prefixes: 89
+  - Resource: AS15169
+  - Block: AS15169 - AS15169
 
-IP-specific resources:
-  - bgp.tools: https://bgp.tools/ip/8.8.8.8
-  - BGPView: https://bgpview.io/ip/8.8.8.8
-  - Team Cymru IP Info: https://whois.cymru.com/cgi-bin/whois.cgi?query=8.8.8.8
-  - IPInfo: https://ipinfo.io/8.8.8.8
-  - NLNOG Ring: https://lg.ring.nlnog.net/
+For more details, visit: https://stat.ripe.net/AS15169
 
-ASN-specific resources for AS15169:
-  - bgp.tools: https://bgp.tools/as/15169
-  - BGPView: https://bgpview.io/asn/15169
+  - RIB Visibility Analysis:
+    - ASNs with AS15169 in their RIB: 245 (98.0%)
+    - ASNs without AS15169 in their RIB: 5 (2.0%)
+
+    - Sample ASNs with AS15169 in their RIB:
+      - AS13030
+      - AS25152
+      - AS34854
+      - AS34927
+      - AS34984
+      - ... and 240 more
+
+    - Sample ASNs without AS15169 in their RIB:
+      - AS12654
+      - AS31500
+      - AS39120
+      - AS48362
+      - AS50300
+
+  - Origin ASNs:
+    - AS15169
+
+  - IRR Sources:
+    - RADB
+    - RIPE
+
+For more details, visit: https://stat.ripe.net/prefix-routing-consistency#{'resource':'8.8.8.0/24'}
+
+3. bgp.tools for detailed prefix analysis:
+   - Visit: https://bgp.tools/prefix/8.8.8.0/24
+   - Shows current routing status and prefix details
+
+4. RouteViews Archive for raw historical data:
+   - Visit: https://archive.routeviews.org/bgpdata/2023.06/RIBS/
+   - Contains raw MRT files that can be analyzed with specialized tools
+
+4. Summary and Recommendations
+----------------------------------------------------------------------
+Summary:
+  - 8.8.8.8 belongs to prefix 8.8.8.0/24 announced by AS15169
+  - Network: GOOGLE (US)
+  - See reachability section for connectivity details
+  - See global routing section for visibility of 8.8.8.0/24
+
+Additional Resources:
+  - NLNOG Ring: https://lg.ring.nlnog.net/ (for traceroutes from multiple locations)
+  - bgp.tools: https://bgp.tools/prefix/8.8.8.0/24
+  - ASN details: https://bgp.tools/as/15169
   - PeeringDB: https://www.peeringdb.com/asn/15169
 
-Prefix-specific resources for 8.8.8.0/24:
-  - bgp.tools: https://bgp.tools/prefix/8.8.8.0/24
-  - BGPView: https://bgpview.io/prefix/8.8.8.0/24
+Report saved to AS15169.txt
 ```
 
 ## Special Cases Handling
@@ -198,35 +260,80 @@ The tool provides informative messages for special cases:
 
 ### Private IP Addresses
 ```
-[+] Getting prefix information for 192.168.1.1...
-NOTE: 192.168.1.1 is a private/special IP address and won't be visible in public routing tables
+NOTE: 192.168.1.1 is a private/special IP address
 Private IPs are not announced on the global internet
 ```
 
 ### Non-routable or Unannounced IPs
 ```
-[+] Getting prefix information for 203.0.113.1...
 Could not determine prefix information for 203.0.113.1
 This may indicate the IP is not announced in the global BGP table
 ```
 
-### API Error Handling
+### IPv6 Support
 ```
-[+] Querying bgp.tools for routing information...
-Error: bgp.tools API returned status code 501
+Resolved example.com to 2606:2800:220:1:248:1893:25c8:1946
+IP: 2606:2800:220:1:248:1893:25c8:1946
+Prefix: 2606:2800::/32
+ASN: AS15133 (EDGECAST)
+Country: US
 ```
 
 ## Advanced Usage
 
-For more advanced network diagnostics, consider:
+### Current Route Visibility
 
-1. Using the bgp.tools links provided for detailed analysis
-2. Comparing routing information from different sources
-3. Investigating ASN relationships and peering information
-4. Using the prefix-specific and ASN-specific links for broader context
-5. Leveraging NLNOG Ring for distributed network diagnostics
-6. Analyzing historical route changes with RIS MRT data over different time periods
-7. Using the provided links to online services for detailed routing analysis
+Use the `--current` flag to see detailed information about the current visibility of your prefix in the global routing table:
+
+```
+./run_diagnostics.sh 8.8.8.8 --current
+```
+
+This will show:
+- Which RIPE RIS collectors can see your prefix
+- How many peers report your prefix at each collector
+- Sample AS paths to reach your prefix
+- Primary and non-primary routes
+
+### IPv6 Analysis
+
+For IPv6 addresses or to force IPv6 resolution for hostnames:
+
+```
+./run_diagnostics.sh 2001:4860:4860::8888
+./run_diagnostics.sh google.com --ipv6
+```
+
+The tool will:
+- Use the appropriate IPv6 whois services
+- Adjust ping commands for IPv6 compatibility
+- Provide IPv6-specific routing information
+
+### RIB Visibility Analysis
+
+The tool provides detailed analysis of which ASNs have your ASN in their routing tables:
+
+```
+RIB Visibility Analysis:
+- ASNs with AS15169 in their RIB: 245 (98.0%)
+- ASNs without AS15169 in their RIB: 5 (2.0%)
+```
+
+This helps identify potential routing issues where certain networks might not be able to reach your prefix.
+
+### Automatic Report Saving
+
+Reports are automatically saved to a file named after the ASN:
+
+```
+Report saved to AS15169.txt
+```
+
+You can specify a custom filename with the `--output` option:
+
+```
+./run_diagnostics.sh 8.8.8.8 --output custom-report.txt
+```
 
 ## NLNOG Ring Usage Tips
 
@@ -245,36 +352,6 @@ The NLNOG Ring looking glass (https://lg.ring.nlnog.net/) provides access to ove
    - Regional routing differences
    - Path asymmetry issues
    - Localized packet loss or latency problems
-
-## RIS MRT Data Analysis
-
-RIS MRT data provides comprehensive historical routing information:
-
-1. **Flexible time period analysis**:
-   - 24h - Last 24 hours of routing data
-   - 2d - Last 2 days of routing data
-   - 5d - Last 5 days of routing data
-   - 7d - Last 7 days of routing data
-   - Compare changes across different time periods to identify patterns
-
-2. **MRT file metadata**:
-   - File size and availability information
-   - Basic header information for smaller files
-   - Links to online services for detailed analysis
-   - Alternative data sources for each date
-
-3. **Online analysis services**:
-   - BGPlay: Interactive visualization of routing changes
-   - RIPEstat: Comprehensive routing history analysis
-   - RouteViews Archive: Historical BGP data
-   - PCH Route Server Data: Additional routing information
-   - CAIDA BGP Data: Research-grade BGP datasets
-
-4. **For detailed local analysis**:
-   - Download links for MRT files
-   - Instructions for installing analysis tools
-   - Command examples for processing the data
-   - Alternative data sources for comprehensive analysis
 
 ## License
 
