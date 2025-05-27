@@ -1,12 +1,4 @@
 #!/usr/bin/env python3
-"""
-Network Diagnostics Tool
-
-This tool generates a report on:
-- Reachability
-- Global Routing Table visibility for the last 24h/2d/5d/7d
-- Comprehensive network diagnostics summary
-"""
 
 import argparse
 import json
@@ -50,17 +42,14 @@ class NetworkDiagnostics:
             self._get_prefix_info()
 
     def _period_to_days(self, period):
-        """Convert period string to number of days."""
         days_map = {"24h": 1, "2d": 2, "5d": 5, "7d": 7}
         return days_map.get(period, 1)  # Default to 1 day if period is not recognized
 
     def _add_to_report(self, text):
-        """Add text to the report."""
         self.report.append(text)
         print(text)
 
     def _is_valid_ip(self, ip_str):
-        """Check if the string is a valid IP address."""
         try:
             ipaddress.ip_address(ip_str)
             return True
@@ -68,7 +57,6 @@ class NetworkDiagnostics:
             return False
 
     def _is_ipv6(self, ip_str):
-        """Check if the string is a valid IPv6 address."""
         try:
             ip = ipaddress.ip_address(ip_str)
             return isinstance(ip, ipaddress.IPv6Address)
@@ -76,7 +64,6 @@ class NetworkDiagnostics:
             return False
 
     def _resolve_target(self):
-        """Resolve hostname to IP if needed."""
         if self.is_ip:
             return self.target
 
@@ -97,7 +84,6 @@ class NetworkDiagnostics:
             return None
 
     def _is_private_ip(self):
-        """Check if the IP is private or special."""
         if not self.target_ip:
             return False
 
@@ -108,7 +94,6 @@ class NetworkDiagnostics:
             return False
 
     def _get_prefix_info(self):
-        """Get prefix information from Team Cymru."""
         self._add_to_report("\n1. Network Information")
         self._add_to_report("-" * 70)
 
@@ -138,7 +123,6 @@ class NetworkDiagnostics:
             self._add_to_report("This may indicate the IP is not announced in the global BGP table")
 
     def _get_team_cymru_info(self):
-        """Get ASN information from Team Cymru whois service."""
         try:
             # Create a socket connection to Team Cymru's whois service
             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -232,7 +216,6 @@ class NetworkDiagnostics:
             return None
 
     def check_reachability(self):
-        """Check reachability using ping."""
         self._add_to_report("\n2. Reachability")
         self._add_to_report("-" * 70)
 
@@ -1087,263 +1070,6 @@ class NetworkDiagnostics:
         except json.JSONDecodeError:
             self._add_to_report("Error parsing RIPE Stat API response")
 
-    def _download_and_analyze_mrt_files(self, start_date):
-        """Download and analyze MRT files from RouteViews."""
-        import gzip
-        import tempfile
-        import shutil
-
-        # Use RouteViews as the source for MRT files
-        # They have a more reliable archive structure than RIPE RIS
-
-        # Format the date for RouteViews URL
-        year_month = start_date.strftime("%Y.%m")
-        day = start_date.strftime("%d")
-        hour = "0000"  # Use midnight snapshot
-
-        # Construct the URL for the MRT file
-        # Example: https://archive.routeviews.org/bgpdata/2023.05/RIBS/rib.20230501.0000.bz2
-        mrt_url = f"https://archive.routeviews.org/bgpdata/{year_month}/RIBS/rib.{start_date.strftime('%Y%m%d')}.{hour}.bz2"
-
-        self._add_to_report(f"Attempting to download MRT file from: {mrt_url}")
-
-        try:
-            # Check if the file exists
-            head_response = requests.head(mrt_url, timeout=10)
-            if head_response.status_code != 200:
-                self._add_to_report(f"MRT file not available (HTTP {head_response.status_code})")
-                self._add_to_report("Trying alternative sources...")
-
-                # Try Oregon RouteViews
-                oregon_url = f"https://archive.routeviews.org/route-views.oregon-ix/bgpdata/{year_month}/RIBS/rib.{start_date.strftime('%Y%m%d')}.{hour}.bz2"
-                self._add_to_report(f"Trying: {oregon_url}")
-
-                head_response = requests.head(oregon_url, timeout=10)
-                if head_response.status_code != 200:
-                    self._add_to_report(f"Alternative MRT file not available (HTTP {head_response.status_code})")
-                    self._add_to_report("Could not find available MRT files for the specified date.")
-                    return
-                else:
-                    mrt_url = oregon_url
-
-            # Get file size
-            file_size = int(head_response.headers.get('content-length', 0))
-            self._add_to_report(f"MRT file size: {file_size / (1024*1024):.2f} MB")
-
-            # For large files, we'll still try to download and process them
-            # but warn the user that it might take a while
-            if file_size > 50 * 1024 * 1024:  # If file is larger than 50MB
-                self._add_to_report(f"Warning: File is large ({file_size / (1024*1024):.2f} MB).")
-                self._add_to_report("Downloading and processing may take several minutes...")
-
-            # Download the file
-            self._add_to_report("Downloading MRT file... (this may take a while)")
-            response = requests.get(mrt_url, stream=True, timeout=60)
-
-            if response.status_code == 200:
-                # Create a temporary file for the MRT data
-                with tempfile.NamedTemporaryFile(delete=False, suffix='.bz2') as temp_file:
-                    temp_path = temp_file.name
-                    for chunk in response.iter_content(chunk_size=8192):
-                        temp_file.write(chunk)
-
-                self._add_to_report("Download complete. Processing file...")
-
-                # Check if bgpdump is installed
-                bgpdump_installed = False
-                try:
-                    subprocess.run(["bgpdump", "-V"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False)
-                    bgpdump_installed = True
-                except FileNotFoundError:
-                    bgpdump_installed = False
-
-                if bgpdump_installed:
-                    # Process the MRT file with bgpdump
-                    self._add_to_report("Using bgpdump to analyze the MRT file...")
-
-                    # Run bgpdump and filter for the prefix
-                    # Use -m option for more readable output
-                    cmd = f"bgpdump -m {temp_path} | grep {self.prefix}"
-                    self._add_to_report(f"Running command: {cmd}")
-                    process = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-                    stdout, stderr = process.communicate()
-
-                    # Clean up the temporary file
-                    try:
-                        os.unlink(temp_path)
-                    except:
-                        pass
-
-                    if process.returncode == 0 and stdout:
-                        # Parse the output to extract routing information
-                        self._add_to_report("\nRouting information found in MRT file:")
-
-                        # Split the output into lines
-                        lines = stdout.strip().split('\n')
-                        total_entries = len(lines)
-                        self._add_to_report(f"Found {total_entries} routing table entries for {self.prefix}")
-
-                        # Process each line to extract detailed information
-                        as_paths = []
-                        origin_asns = {}
-                        next_hops = {}
-                        peers = {}
-                        path_lengths = {}
-                        communities = {}
-
-                        for line in lines:
-                            # Extract timestamp, peer, and prefix
-                            parts = line.split('|')
-                            if len(parts) >= 5:
-                                timestamp = parts[0].strip()
-                                peer = parts[1].strip()
-                                prefix = parts[2].strip()
-
-                                # Extract AS path
-                                as_path_match = re.search(r'AS_PATH: (.*?)($|\s+NEXT_HOP)', line)
-                                if as_path_match:
-                                    as_path = as_path_match.group(1).strip()
-                                    as_paths.append(as_path)
-
-                                    # Extract path length
-                                    path_parts = as_path.split()
-                                    path_length = len(path_parts)
-                                    path_lengths[path_length] = path_lengths.get(path_length, 0) + 1
-
-                                    # Extract origin ASN (last ASN in the path)
-                                    if path_parts:
-                                        origin_asn = path_parts[-1]
-                                        origin_asns[origin_asn] = origin_asns.get(origin_asn, 0) + 1
-
-                                # Extract next hop
-                                next_hop_match = re.search(r'NEXT_HOP: ([^ ]+)', line)
-                                if next_hop_match:
-                                    next_hop = next_hop_match.group(1)
-                                    next_hops[next_hop] = next_hops.get(next_hop, 0) + 1
-
-                                # Extract peer ASN
-                                if peer:
-                                    peers[peer] = peers.get(peer, 0) + 1
-
-                                # Extract communities
-                                community_match = re.search(r'COMMUNITY: (.*?)($|\s+ORIGINATOR)', line)
-                                if community_match:
-                                    community_str = community_match.group(1).strip()
-                                    for community in community_str.split():
-                                        communities[community] = communities.get(community, 0) + 1
-
-                        # Generate comprehensive analytics
-                        self._add_to_report("\n=== ROUTING ANALYTICS ===")
-
-                        # 1. Visibility Analysis
-                        self._add_to_report("\nVisibility Analysis:")
-                        self._add_to_report(f"- Prefix {self.prefix} is visible in {total_entries} routing table entries")
-                        self._add_to_report(f"- Seen from {len(peers)} unique BGP peers")
-                        self._add_to_report(f"- Announced by {len(origin_asns)} origin ASNs")
-
-                        # 2. Origin ASN Analysis
-                        self._add_to_report("\nOrigin ASN Analysis:")
-                        for asn, count in sorted(origin_asns.items(), key=lambda x: x[1], reverse=True)[:5]:
-                            percentage = (count / total_entries) * 100
-                            self._add_to_report(f"- AS{asn}: {count} entries ({percentage:.1f}%)")
-
-                            # Try to get ASN name
-                            asn_name = "Unknown"
-                            asn_names = {
-                                "15169": "GOOGLE",
-                                "16509": "AMAZON-02",
-                                "32934": "FACEBOOK",
-                                "13414": "TWITTER",
-                                "36459": "GITHUB",
-                                "13335": "CLOUDFLARE",
-                                "54113": "FASTLY",
-                                "20940": "AKAMAI",
-                                "714": "APPLE",
-                                "8075": "MICROSOFT"
-                            }
-                            if asn in asn_names:
-                                asn_name = asn_names[asn]
-                            self._add_to_report(f"  Network: {asn_name}")
-
-                        if len(origin_asns) > 5:
-                            self._add_to_report(f"- ... and {len(origin_asns) - 5} more origin ASNs")
-
-                        # Check for potential prefix hijacking
-                        if len(origin_asns) > 1:
-                            self._add_to_report("\n⚠️ ALERT: Multiple origin ASNs detected!")
-                            self._add_to_report("This could indicate prefix hijacking or legitimate multi-homing.")
-                            self._add_to_report("Investigate further to determine if this is expected behavior.")
-
-                        # 3. Path Length Analysis
-                        self._add_to_report("\nPath Length Analysis:")
-                        avg_path_length = sum(length * count for length, count in path_lengths.items()) / total_entries
-                        self._add_to_report(f"- Average AS path length: {avg_path_length:.1f} hops")
-
-                        min_length = min(path_lengths.keys())
-                        max_length = max(path_lengths.keys())
-                        self._add_to_report(f"- Shortest path: {min_length} hops")
-                        self._add_to_report(f"- Longest path: {max_length} hops")
-
-                        # 4. Path Distribution
-                        self._add_to_report("\nPath Distribution:")
-                        unique_paths = len(set(as_paths))
-                        self._add_to_report(f"- {unique_paths} unique AS paths for {self.prefix}")
-
-                        # Show sample paths (shortest, longest, and one in between if available)
-                        paths_by_length = {}
-                        for path in as_paths:
-                            length = len(path.split())
-                            if length not in paths_by_length:
-                                paths_by_length[length] = []
-                            if len(paths_by_length[length]) < 2:  # Keep up to 2 examples per length
-                                paths_by_length[length].append(path)
-
-                        self._add_to_report("\nSample AS Paths:")
-                        # Show shortest path
-                        if min_length in paths_by_length:
-                            self._add_to_report(f"- Shortest ({min_length} hops): {paths_by_length[min_length][0]}")
-
-                        # Show a path in the middle if available
-                        mid_length = (min_length + max_length) // 2
-                        if mid_length != min_length and mid_length != max_length and mid_length in paths_by_length:
-                            self._add_to_report(f"- Medium ({mid_length} hops): {paths_by_length[mid_length][0]}")
-
-                        # Show longest path
-                        if max_length in paths_by_length:
-                            self._add_to_report(f"- Longest ({max_length} hops): {paths_by_length[max_length][0]}")
-
-                        # 5. Community Analysis
-                        if communities:
-                            self._add_to_report("\nBGP Communities:")
-                            for community, count in sorted(communities.items(), key=lambda x: x[1], reverse=True)[:5]:
-                                percentage = (count / total_entries) * 100
-                                self._add_to_report(f"- {community}: {count} entries ({percentage:.1f}%)")
-
-                            if len(communities) > 5:
-                                self._add_to_report(f"- ... and {len(communities) - 5} more communities")
-                    else:
-                        self._add_to_report(f"No routing information found for {self.prefix} in the MRT file")
-                        if stderr:
-                            self._add_to_report(f"Error: {stderr}")
-                else:
-                    self._add_to_report("bgpdump is not installed. Cannot process MRT file.")
-                    self._add_to_report("To install bgpdump:")
-                    self._add_to_report("  - On macOS: brew install bgpdump")
-                    self._add_to_report("  - On Ubuntu/Debian: apt-get install bgpdump")
-                    self._add_to_report("  - From source: https://github.com/RIPE-NCC/bgpdump")
-
-                    # Clean up the temporary file
-                    try:
-                        os.unlink(temp_path)
-                    except:
-                        pass
-            else:
-                self._add_to_report(f"Error downloading MRT file: HTTP {response.status_code}")
-
-        except requests.exceptions.RequestException as e:
-            self._add_to_report(f"Error downloading MRT file: {e}")
-        except Exception as e:
-            self._add_to_report(f"Error processing MRT file: {e}")
 
     def generate_report(self):
         """Generate a comprehensive report."""
