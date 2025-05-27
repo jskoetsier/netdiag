@@ -78,7 +78,7 @@ Where:
 - `TARGET` is an IP address or hostname you want to diagnose
 - `--period PERIOD` (optional) is the time period for historical analysis (24h, 2d, 5d, 7d)
 - `--ipv6` (optional) forces IPv6 resolution for hostnames
-- `--current` (optional) shows actual route visibility in the global routing table
+- `--current` (optional) includes RIPE RIS looking glass data in the report
 - `--output FILE` (optional) specifies a custom output file (default: AS{number}.txt)
 
 Examples:
@@ -89,7 +89,7 @@ Examples:
 # Analyze 7 days of routing history
 ./run_diagnostics.sh 8.8.8.8 --period 7d
 
-# Show current route visibility
+# Include RIPE RIS looking glass data
 ./run_diagnostics.sh 8.8.8.8 --current
 
 # Force IPv6 resolution
@@ -281,19 +281,21 @@ Country: US
 
 ## Advanced Usage
 
-### Current Route Visibility
+### RIPE RIS Looking Glass Data
 
-Use the `--current` flag to see detailed information about the current visibility of your prefix in the global routing table:
+Use the `--current` flag to include RIPE RIS looking glass data in the report:
 
 ```
 ./run_diagnostics.sh 8.8.8.8 --current
 ```
 
-This will show:
-- Which RIPE RIS collectors can see your prefix
-- How many peers report your prefix at each collector
-- Sample AS paths to reach your prefix
-- Primary and non-primary routes
+When this flag is set, the tool will:
+- Query the RIPE Stat Looking Glass API
+- Show which RIPE RIS collectors can see your prefix
+- Display how many peers report your prefix at each collector
+- List sample AS paths to reach your prefix
+
+Without this flag, the tool will skip the looking glass query to provide a more concise report focused on historical data.
 
 ### IPv6 Analysis
 
