@@ -1,0 +1,115 @@
+Network Diagnostics Report for 103.225.28.1
+======================================================================
+Generated on: 2025-05-27 14:46:35
+Time period: 24h (1 days)
+
+
+1. Network Information
+----------------------------------------------------------------------
+IP: 103.225.28.1
+Prefix: 103.225.28.0/24
+ASN: AS135338 (apnic)
+Country: HK
+
+2. Reachability
+----------------------------------------------------------------------
+Checking reachability for 103.225.28.1...
+Host is reachable
+Ping statistics: min=244.789ms, avg=247.716ms, max=254.897ms
+Packet loss: 0.0%
+
+3. Global Routing Table Visibility
+----------------------------------------------------------------------
+Checking global routing visibility for 103.225.28.0/24 over the last 1 days...
+
+Prefix 103.225.28.0/24 is announced by:
+  - ASN: AS135338
+  - Network: apnic
+  - Country: HK
+
+Current and Historical Routing Information:
+Analyzing routing data for the period: 2025-05-26 to 2025-05-27
+
+Additional routing information from whois:
+  - Route: 103.225.28.0/24
+  - Origin: AS135338
+  - Description: STARCLOUD INFORMATION LIMITED
+  - Description: STARCLOUD INFORMATION LIMITED
+
+Routing changes analysis:
+To check for routing changes over the last 1 days, use these resources:
+
+1. NLNOG Ring looking glass (current routing state):
+   - Visit: https://lg.ring.nlnog.net/
+   - Select different nodes to get diverse perspectives
+   - For your prefix 103.225.28.0/24, use command: 'show ip bgp 103.225.28.0/24'
+
+2. RIPE Stat API Analysis:
+   Querying RIPE Stat API for routing information...
+
+Querying RIPE Stat BGPlay API for routing changes...
+Analyzing routing changes from 2025-05-26 to 2025-05-27...
+
+Found 151 routing events for 103.225.28.0/24:
+
+Event type summary:
+  - A: 149 events
+  - W: 2 events
+
+Sample events:
+  - 2025-05-26T00:01:59: A event from Peer unavailable
+  - 2025-05-26T00:32:02: A event from Peer unavailable
+  - 2025-05-26T00:33:24: A event from Peer unavailable
+  - 2025-05-26T01:00:19: A event from Peer unavailable
+  - 2025-05-26T01:00:38: A event from Peer unavailable
+
+... and 146 more events
+
+Routing stability analysis:
+  - Announcements: 149
+  - Withdrawals: 2
+  - Events per day: 151.0
+  - Assessment: High routing activity detected
+    This could indicate route flapping or instability
+
+Querying RIPE Stat AS Overview API...
+
+AS Overview Information:
+  - AS135338 Holder: STARCLOUD-AS-AP STARCLOUD INFORMATION LIMITED
+  - Resource: 135338
+  - Block: {'resource': '134557-135580', 'desc': 'Assigned by APNIC', 'name': 'IANA 32-bit Autonomous System (AS) Numbers Registry'}
+
+Contact Information:
+  - Organization: STARCLOUD INFORMATION LIMITED
+  - Address:
+    6 Cordelia Street
+    South Brisbane
+    QLD 4101
+  - Abuse Email: noc@starcloud.com.hk
+  - Note: No NOC contact found. Check PeeringDB: https://www.peeringdb.com/asn/135338
+
+For more details, visit: https://stat.ripe.net/AS135338
+
+For more details, visit: https://stat.ripe.net/prefix-routing-consistency#{'resource':'103.225.28.0/24'}
+
+3. bgp.tools for detailed prefix analysis:
+   - Visit: https://bgp.tools/prefix/103.225.28.0/24
+   - Shows current routing status and prefix details
+
+4. RouteViews Archive for raw historical data:
+   - Visit: https://archive.routeviews.org/bgpdata/2025.05/RIBS/
+   - Contains raw MRT files that can be analyzed with specialized tools
+
+4. Summary and Recommendations
+----------------------------------------------------------------------
+Summary:
+  - 103.225.28.1 belongs to prefix 103.225.28.0/24 announced by AS135338
+  - Network: apnic (HK)
+  - See reachability section for connectivity details
+  - See global routing section for visibility of 103.225.28.0/24
+
+Additional Resources:
+  - NLNOG Ring: https://lg.ring.nlnog.net/ (for traceroutes from multiple locations)
+  - bgp.tools: https://bgp.tools/prefix/103.225.28.0/24
+  - ASN details: https://bgp.tools/as/135338
+  - PeeringDB: https://www.peeringdb.com/asn/135338
