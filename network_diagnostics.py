@@ -181,9 +181,9 @@ class NetworkDiagnostics:
                     asn_name = parts[4]
 
                     if asn and asn != "NA" and bgp_prefix and bgp_prefix != "NA":
-                        # Fix for ARIN being reported as the network name
-                        # If asn_name is "arin", try to get a better name
-                        if asn_name.lower() == "arin":
+                        # Fix for registry names being reported as the network name
+                        # If asn_name is a registry name, try to get a better name
+                        if asn_name.lower() in ["arin", "ripencc", "lacnic", "afrinic", "apnic", "ripe"]:
                             # For well-known ASNs, provide the correct name
                             asn_names = {
                                 "15169": "GOOGLE",
@@ -724,9 +724,25 @@ class NetworkDiagnostics:
                         if contact_info['tech_email'] and contact_info['tech_email'] != contact_info['noc_email'] and contact_info['tech_email'] != contact_info['admin_email'] and contact_info['tech_email'] != contact_info['abuse_email']:
                             self._add_to_report(f"  - Tech Email: {contact_info['tech_email']}")
 
-                        # If no NOC contact was found, suggest checking PeeringDB
+                        # If no NOC contact was found, check if PeeringDB page exists before suggesting it
                         if not (contact_info['noc_email'] or contact_info['noc_phone']):
-                            self._add_to_report(f"  - Note: No NOC contact found. Check PeeringDB: https://www.peeringdb.com/asn/{self.asn}")
+                            # Check if PeeringDB page exists
+                            try:
+                                peeringdb_url = f"https://www.peeringdb.com/api/net?asn={self.asn}"
+                                peeringdb_response = requests.get(peeringdb_url, timeout=5)
+
+                                if peeringdb_response.status_code == 200:
+                                    peeringdb_data = peeringdb_response.json()
+
+                                    # Check if there's data for this ASN
+                                    if peeringdb_data.get("data") and len(peeringdb_data["data"]) > 0:
+                                        self._add_to_report(f"  - Note: No NOC contact found. Check PeeringDB: https://www.peeringdb.com/asn/{self.asn}")
+                                    else:
+                                        self._add_to_report(f"  - Note: No NOC contact found. No PeeringDB entry available for AS{self.asn}.")
+                                else:
+                                    self._add_to_report(f"  - Note: No NOC contact found.")
+                            except:
+                                self._add_to_report(f"  - Note: No NOC contact found.")
 
                     # Provide link to AS Overview in RIPE Stat
                     self._add_to_report(f"\nFor more details, visit: https://stat.ripe.net/AS{self.asn}")
@@ -877,46 +893,68 @@ class NetworkDiagnostics:
                                 event_type = event.get("type", "Unknown")
                                 event_types[event_type] = event_types.get(event_type, 0) + 1
 
-                            # Show event type summary
+                            # Show event type summary with explanation
                             self._add_to_report("\nEvent type summary:")
                             for event_type, count in sorted(event_types.items(), key=lambda x: x[1], reverse=True):
-                                self._add_to_report(f"  - {event_type}: {count} events")
+                                if event_type == "A":
+                                    self._add_to_report(f"  - A (Announcement): {count} events - Prefix was announced by an AS")
+                                elif event_type == "W":
+                                    self._add_to_report(f"  - W (Withdrawal): {count} events - Prefix was withdrawn by an AS")
+                                else:
+                                    self._add_to_report(f"  - {event_type}: {count} events")
+
+                            # Find the most informative events to show as samples
+                            # We want to prioritize events with complete path information
+                            informative_events = []
+                            for event in events:
+                                event_type = event.get("type", "Unknown")
+                                has_path = "path" in event and event["path"]
+                                has_peer = event.get("peer", "Unknown") != "Unknown"
+
+                                # Score the event based on how informative it is
+                                score = 0
+                                if has_path:
+                                    score += 2
+                                if has_peer:
+                                    score += 1
+
+                                informative_events.append((event, score))
+
+                            # Sort events by score (most informative first)
+                            informative_events.sort(key=lambda x: x[1], reverse=True)
+
+                            # Take the top 5 most informative events
+                            sample_events = [e[0] for e in informative_events[:5]]
+
+                            # If we couldn't find 5 informative events, add some regular events
+                            if len(sample_events) < 5:
+                                remaining = 5 - len(sample_events)
+                                for event in events:
+                                    if event not in sample_events:
+                                        sample_events.append(event)
+                                        remaining -= 1
+                                        if remaining == 0:
+                                            break
 
                             # Show sample events
-                            self._add_to_report("\nSample events:")
-                            for i, event in enumerate(events[:5]):  # Show first 5 events
+                            self._add_to_report("\nSample routing events:")
+                            for event in sample_events:
                                 event_type = event.get("type", "Unknown")
                                 timestamp = event.get("timestamp", "Unknown")
                                 peer = event.get("peer", "Unknown")
 
-                                # More aggressive approach to extract peer ASN information
+                                # Extract peer information
                                 if peer and peer != "Unknown":
                                     peer_str = f"AS{peer}"
-                                else:
-                                    # Try to extract from path if available
-                                    if "path" in event and event["path"]:
-                                        path = event["path"]
-                                        if path:
-                                            # Use the first ASN in the path as the peer
-                                            peer_str = f"AS{path[0]}"
-                                        else:
-                                            peer_str = "Peer unavailable"
+                                elif "path" in event and event["path"]:
+                                    path = event["path"]
+                                    if path:
+                                        # Use the first ASN in the path as the peer
+                                        peer_str = f"AS{path[0]}"
                                     else:
-                                        # Try to extract from other fields
-                                        peer_found = False
-                                        for key, value in event.items():
-                                            if isinstance(value, (int, str)) and str(value).isdigit():
-                                                try:
-                                                    asn_int = int(value)
-                                                    if 1 <= asn_int <= 4200000000:  # Valid ASN range
-                                                        peer_str = f"AS{value}"
-                                                        peer_found = True
-                                                        break
-                                                except:
-                                                    pass
-
-                                        if not peer_found:
-                                            peer_str = "Peer unavailable"
+                                        peer_str = "from collector"
+                                else:
+                                    peer_str = "from collector"
 
                                 # Convert timestamp to readable format
                                 try:
@@ -925,26 +963,70 @@ class NetworkDiagnostics:
                                 except:
                                     timestamp_str = str(timestamp)
 
-                                self._add_to_report(f"  - {timestamp_str}: {event_type} event from {peer_str}")
+                                # Format the event description
+                                if event_type == "A":
+                                    event_desc = f"{timestamp_str}: Prefix ANNOUNCED {peer_str}"
+                                elif event_type == "W":
+                                    event_desc = f"{timestamp_str}: Prefix WITHDRAWN {peer_str}"
+                                else:
+                                    event_desc = f"{timestamp_str}: {event_type} event {peer_str}"
+
+                                self._add_to_report(f"  - {event_desc}")
 
                                 # Show path details for announcements
                                 if event_type == "A" and "path" in event:
                                     path = event["path"]
-                                    path_str = " ".join(str(asn) for asn in path)
-                                    self._add_to_report(f"    Path: {path_str}")
+                                    if path:
+                                        path_str = " → ".join(f"AS{asn}" for asn in path)
+                                        self._add_to_report(f"    Path: {path_str}")
+
+                                        # Show origin ASN (last in path)
+                                        if path:
+                                            origin_asn = path[-1]
+                                            self._add_to_report(f"    Origin: AS{origin_asn}")
 
                             if len(events) > 5:
                                 self._add_to_report(f"\n... and {len(events) - 5} more events")
 
-                            # Analyze routing stability
+                            # Analyze routing stability focusing on origin AS changes
                             self._add_to_report("\nRouting stability analysis:")
 
-                            # Check for route flapping (frequent announcements and withdrawals)
+                            # Count announcements and withdrawals
                             announcements = sum(1 for e in events if e.get("type") == "A")
                             withdrawals = sum(1 for e in events if e.get("type") == "W")
 
+                            self._add_to_report(f"  - Total routing events: {len(events)}")
                             self._add_to_report(f"  - Announcements: {announcements}")
                             self._add_to_report(f"  - Withdrawals: {withdrawals}")
+
+                            # Track origin AS changes
+                            origin_changes = 0
+                            current_origin = None
+                            origin_asns = set()
+
+                            # Sort events by timestamp
+                            sorted_events = sorted(events, key=lambda e: e.get("timestamp", 0))
+
+                            for event in sorted_events:
+                                if event.get("type") == "A" and "path" in event and event["path"]:
+                                    path = event["path"]
+                                    if path:
+                                        origin_asn = path[-1]  # Last ASN in path is the origin
+                                        origin_asns.add(origin_asn)
+
+                                        if current_origin is not None and current_origin != origin_asn:
+                                            origin_changes += 1
+
+                                        current_origin = origin_asn
+
+                            # Report origin changes
+                            self._add_to_report(f"  - Origin AS changes: {origin_changes}")
+                            self._add_to_report(f"  - Unique origin ASNs observed: {len(origin_asns)}")
+
+                            if origin_asns:
+                                self._add_to_report("  - Origin ASNs observed:")
+                                for asn in origin_asns:
+                                    self._add_to_report(f"    - AS{asn}")
 
                             # Calculate events per day
                             days_diff = (end_date - start_date).days or 1  # Avoid division by zero
@@ -952,11 +1034,20 @@ class NetworkDiagnostics:
 
                             self._add_to_report(f"  - Events per day: {events_per_day:.1f}")
 
-                            # Assess stability
-                            if events_per_day > 10:
+                            # Assess stability based on origin changes, not just event count
+                            if origin_changes > 0:
+                                self._add_to_report("  - Assessment: Origin AS changes detected")
+                                self._add_to_report("    This could indicate prefix hijacking or legitimate changes in announcement policy")
+                            elif len(origin_asns) > 1:
+                                self._add_to_report("  - Assessment: Multiple origin ASNs detected")
+                                self._add_to_report("    This could indicate anycast deployment or multi-homing")
+                            elif withdrawals > announcements * 0.5:  # High ratio of withdrawals to announcements
+                                self._add_to_report("  - Assessment: High withdrawal ratio detected")
+                                self._add_to_report("    This could indicate intermittent connectivity or route flapping")
+                            elif events_per_day > 20:
                                 self._add_to_report("  - Assessment: High routing activity detected")
-                                self._add_to_report("    This could indicate route flapping or instability")
-                            elif events_per_day > 5:
+                                self._add_to_report("    This could indicate route propagation issues in the global routing table")
+                            elif events_per_day > 10:
                                 self._add_to_report("  - Assessment: Moderate routing activity detected")
                             else:
                                 self._add_to_report("  - Assessment: Low routing activity, prefix appears stable")
