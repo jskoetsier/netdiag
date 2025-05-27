@@ -1,6 +1,6 @@
 Network Diagnostics Report for 8.8.8.8
 ======================================================================
-Generated on: 2025-05-27 13:29:04
+Generated on: 2025-05-27 14:07:27
 Time period: 24h (1 days)
 
 
@@ -15,7 +15,7 @@ Country: US
 ----------------------------------------------------------------------
 Checking reachability for 8.8.8.8...
 Host is reachable
-Ping statistics: min=60.086ms, avg=65.828ms, max=74.202ms
+Ping statistics: min=42.470ms, avg=49.566ms, max=58.800ms
 Packet loss: 0.0%
 
 3. Global Routing Table Visibility
@@ -48,33 +48,33 @@ Found routing information from 23 RIPE RIS collectors:
 
 Collector: RRC00 (Amsterdam, Netherlands)
   Peers reporting this prefix: 47
-  - Peer Unknown ASN (ID: Unknown)
-  - Peer Unknown ASN (ID: Unknown)
-  - Peer Unknown ASN (ID: Unknown)
+  - Peer AS15169 (ID: Unknown)
+  - Peer AS15169 (ID: Unknown)
+  - Peer AS15169 (ID: Unknown)
 
 Collector: RRC01 (London, United Kingdom)
   Peers reporting this prefix: 35
-  - Peer Unknown ASN (ID: Unknown)
-  - Peer Unknown ASN (ID: Unknown)
-  - Peer Unknown ASN (ID: Unknown)
+  - Peer AS15169 (ID: Unknown)
+  - Peer AS15169 (ID: Unknown)
+  - Peer AS15169 (ID: Unknown)
 
 Collector: RRC24 (Montevideo, Uruguay)
   Peers reporting this prefix: 16
-  - Peer Unknown ASN (ID: Unknown)
-  - Peer Unknown ASN (ID: Unknown)
-  - Peer Unknown ASN (ID: Unknown)
+  - Peer AS15169 (ID: Unknown)
+  - Peer AS15169 (ID: Unknown)
+  - Peer AS15169 (ID: Unknown)
 
 Collector: RRC25 (Amsterdam, Netherlands)
   Peers reporting this prefix: 50
-  - Peer Unknown ASN (ID: Unknown)
-  - Peer Unknown ASN (ID: Unknown)
-  - Peer Unknown ASN (ID: Unknown)
+  - Peer AS15169 (ID: Unknown)
+  - Peer AS15169 (ID: Unknown)
+  - Peer AS15169 (ID: Unknown)
 
 Collector: RRC23 (Singapore, Singapore)
   Peers reporting this prefix: 8
-  - Peer Unknown ASN (ID: Unknown)
-  - Peer Unknown ASN (ID: Unknown)
-  - Peer Unknown ASN (ID: Unknown)
+  - Peer AS15169 (ID: Unknown)
+  - Peer AS15169 (ID: Unknown)
+  - Peer AS15169 (ID: Unknown)
 
 ... and 18 more collectors
 
@@ -109,6 +109,12 @@ AS Overview Information:
   - AS15169 Holder: GOOGLE
   - Resource: 15169
   - Block: {'resource': '13312-15359', 'desc': 'Assigned by ARIN', 'name': 'IANA 16-bit Autonomous System (AS) Numbers Registry'}
+
+Contact Information:
+  - Address:
+    1600 Amphitheatre Parkway
+  - Phone: +1-650-253-0000
+  - Admin Email: arin-contact@google.com
 
 For more details, visit: https://stat.ripe.net/AS15169
 

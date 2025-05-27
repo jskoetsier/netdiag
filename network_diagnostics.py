@@ -465,24 +465,45 @@ class NetworkDiagnostics:
                                         peer_asn = peer.get("asn", "Unknown")
                                         peer_id = peer.get("id", "Unknown")
 
-                                        # Format the peer ASN correctly
+                                        # More aggressive approach to extract ASN information
+                                        # First try the peer ASN directly
                                         if peer_asn and peer_asn != "Unknown":
                                             peer_asn_str = f"AS{peer_asn}"
-                                        else:
-                                            # Try to extract ASN from peer ID if available
-                                            if isinstance(peer_id, str) and peer_id.isdigit():
-                                                peer_asn_str = f"AS{peer_id}"
-                                            else:
-                                                # Try to find ASN in entries if available
-                                                if "entries" in peer and peer["entries"]:
-                                                    # Get the first entry's origin ASN
-                                                    first_entry = peer["entries"][0]
-                                                    if "origin" in first_entry and first_entry["origin"] != "Unknown":
-                                                        peer_asn_str = f"AS{first_entry['origin']}"
-                                                    else:
-                                                        peer_asn_str = "Unknown ASN"
+                                        # Then try the peer ID
+                                        elif isinstance(peer_id, str) and peer_id.isdigit():
+                                            peer_asn_str = f"AS{peer_id}"
+                                        # Then try to extract from entries
+                                        elif "entries" in peer and peer["entries"]:
+                                            # Try to get ASN from the first entry
+                                            first_entry = peer["entries"][0]
+                                            if "origin" in first_entry and first_entry["origin"] != "Unknown":
+                                                peer_asn_str = f"AS{first_entry['origin']}"
+                                            # Try to extract from AS path
+                                            elif "as_path" in first_entry and first_entry["as_path"]:
+                                                path = first_entry["as_path"]
+                                                if path:
+                                                    # Use the first ASN in the path
+                                                    peer_asn_str = f"AS{path[0]}"
                                                 else:
-                                                    peer_asn_str = "Unknown ASN"
+                                                    peer_asn_str = "Peer ASN unavailable"
+                                            else:
+                                                peer_asn_str = "Peer ASN unavailable"
+                                        # If all else fails, check if there's a key in the peer object that might contain the ASN
+                                        else:
+                                            asn_found = False
+                                            for key, value in peer.items():
+                                                if isinstance(value, (int, str)) and str(value).isdigit():
+                                                    try:
+                                                        asn_int = int(value)
+                                                        if 1 <= asn_int <= 4200000000:  # Valid ASN range
+                                                            peer_asn_str = f"AS{value}"
+                                                            asn_found = True
+                                                            break
+                                                    except:
+                                                        pass
+
+                                            if not asn_found:
+                                                peer_asn_str = "Peer ASN unavailable"
 
                                         self._add_to_report(f"  - Peer {peer_asn_str} (ID: {peer_id})")
 
@@ -517,6 +538,95 @@ class NetworkDiagnostics:
             self._add_to_report(f"Error connecting to RIPE Stat API: {e}")
         except json.JSONDecodeError:
             self._add_to_report("Error parsing RIPE Stat API response")
+
+    def _get_asn_contact_details(self):
+        """Get contact details for an ASN from whois."""
+        if not self.asn:
+            return None
+
+        contact_info = {
+            'admin_email': None,
+            'tech_email': None,
+            'abuse_email': None,
+            'organization': None,
+            'address': [],
+            'phone': None
+        }
+
+        try:
+            # Run whois command for the ASN
+            whois_cmd = ["whois", f"AS{self.asn}"]
+            whois_process = subprocess.Popen(whois_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            stdout, stderr = whois_process.communicate()
+
+            if whois_process.returncode == 0 and stdout:
+                # Extract contact information
+
+                # Extract organization
+                org_match = re.search(r'Organization:\s*(.*)', stdout)
+                if org_match:
+                    contact_info['organization'] = org_match.group(1).strip()
+                else:
+                    # Try alternative fields
+                    org_match = re.search(r'org-name:\s*(.*)', stdout)
+                    if org_match:
+                        contact_info['organization'] = org_match.group(1).strip()
+
+                # Extract address
+                address_matches = re.findall(r'Address:\s*(.*)', stdout)
+                if address_matches:
+                    contact_info['address'] = [addr.strip() for addr in address_matches]
+                else:
+                    # Try alternative fields
+                    address_matches = re.findall(r'address:\s*(.*)', stdout)
+                    if address_matches:
+                        contact_info['address'] = [addr.strip() for addr in address_matches]
+
+                # Extract phone
+                phone_match = re.search(r'Phone:\s*(.*)', stdout)
+                if phone_match:
+                    contact_info['phone'] = phone_match.group(1).strip()
+
+                # Extract emails
+                admin_email_match = re.search(r'Admin Email:\s*(.*)', stdout, re.IGNORECASE)
+                if admin_email_match:
+                    contact_info['admin_email'] = admin_email_match.group(1).strip()
+
+                tech_email_match = re.search(r'Tech Email:\s*(.*)', stdout, re.IGNORECASE)
+                if tech_email_match:
+                    contact_info['tech_email'] = tech_email_match.group(1).strip()
+
+                abuse_email_match = re.search(r'Abuse Email:\s*(.*)', stdout, re.IGNORECASE) or re.search(r'abuse-mailbox:\s*(.*)', stdout, re.IGNORECASE)
+                if abuse_email_match:
+                    contact_info['abuse_email'] = abuse_email_match.group(1).strip()
+
+                # If no specific emails found, look for any email
+                if not (contact_info['admin_email'] or contact_info['tech_email'] or contact_info['abuse_email']):
+                    email_matches = re.findall(r'[\w\.-]+@[\w\.-]+', stdout)
+                    if email_matches:
+                        # Use the first email found
+                        contact_info['admin_email'] = email_matches[0]
+
+                # Try to find abuse contact from abuse.net
+                if not contact_info['abuse_email']:
+                    try:
+                        # Query abuse.net for the ASN
+                        abuse_cmd = ["dig", f"AS{self.asn}.abuse-contacts.abusix.org", "TXT", "+short"]
+                        abuse_process = subprocess.Popen(abuse_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                        abuse_stdout, abuse_stderr = abuse_process.communicate()
+
+                        if abuse_process.returncode == 0 and abuse_stdout:
+                            # Extract email from the TXT record
+                            abuse_email_match = re.search(r'"(.*?)"', abuse_stdout)
+                            if abuse_email_match:
+                                contact_info['abuse_email'] = abuse_email_match.group(1).strip()
+                    except:
+                        pass
+
+        except Exception as e:
+            print(f"Error getting ASN contact details: {e}")
+
+        return contact_info
 
     def _query_ripe_as_overview(self):
         """Query the RIPE Stat API for AS Overview data."""
@@ -560,6 +670,31 @@ class NetworkDiagnostics:
                     if "block" in as_data:
                         block = as_data["block"]
                         self._add_to_report(f"  - Block: {block}")
+
+                    # Get contact details
+                    contact_info = self._get_asn_contact_details()
+                    if contact_info:
+                        self._add_to_report("\nContact Information:")
+
+                        if contact_info['organization'] and contact_info['organization'] != holder:
+                            self._add_to_report(f"  - Organization: {contact_info['organization']}")
+
+                        if contact_info['address']:
+                            self._add_to_report("  - Address:")
+                            for addr in contact_info['address'][:3]:  # Show up to 3 address lines
+                                self._add_to_report(f"    {addr}")
+
+                        if contact_info['phone']:
+                            self._add_to_report(f"  - Phone: {contact_info['phone']}")
+
+                        if contact_info['abuse_email']:
+                            self._add_to_report(f"  - Abuse Email: {contact_info['abuse_email']}")
+
+                        if contact_info['admin_email'] and contact_info['admin_email'] != contact_info['abuse_email']:
+                            self._add_to_report(f"  - Admin Email: {contact_info['admin_email']}")
+
+                        if contact_info['tech_email'] and contact_info['tech_email'] != contact_info['admin_email'] and contact_info['tech_email'] != contact_info['abuse_email']:
+                            self._add_to_report(f"  - Tech Email: {contact_info['tech_email']}")
 
                     # Provide link to AS Overview in RIPE Stat
                     self._add_to_report(f"\nFor more details, visit: https://stat.ripe.net/AS{self.asn}")
