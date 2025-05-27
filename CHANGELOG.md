@@ -122,7 +122,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed handling of special characters in ASN names
 - Corrected calculation of routing stability metrics
 
-## [2.3.0] - 2024-03-05
+## [2.3.0] - 2025-05-27
 
 ### Added
 - Detailed installation guide (INSTALL.md)
