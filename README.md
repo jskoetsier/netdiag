@@ -3,9 +3,10 @@
 A comprehensive network diagnostics tool that helps troubleshoot connectivity issues by:
 
 - Getting prefix and ASN information using Team Cymru
-- Querying bgp.tools and BGPView APIs for routing information
-- Analyzing historical route changes with RIS MRT data
+- Analyzing current and historical routing information using RIPE Stat APIs
+- Checking reachability with detailed ping statistics
 - Providing links to multiple BGP and routing information resources
+- Supporting both IPv4 and IPv6 addresses
 
 ## Features
 
@@ -20,19 +21,21 @@ Automatically identifies the network prefix an IP belongs to:
 
 Queries several authoritative BGP data sources:
 - Team Cymru whois service for initial prefix and ASN information
-- bgp.tools API for detailed routing information and route server visibility
-- BGPView API for additional prefix and ASN details
+- RIPE Stat APIs for comprehensive routing information:
+  - Looking Glass API for current routing visibility
+  - BGPlay API for historical routing changes
+  - AS Overview API for ASN details
+  - AS Routing Consistency API for RIB visibility analysis
 - NLNOG Ring looking glass for distributed network diagnostics
-- RIS MRT data for in-depth route change analysis over multiple time periods
 - Cross-references information between sources for reliability
 
 ### 3. Historical Route Analysis
 
 Provides insights into routing changes and events:
-- RIS MRT data analysis for flexible time periods (24h, 2d, 5d, 7d)
-- MRT file metadata extraction without requiring external tools
-- Links to online services for detailed routing analysis
-- Alternative data sources for comprehensive historical analysis
+- RIPE Stat BGPlay API for historical routing changes over flexible time periods (24h, 2d, 5d, 7d)
+- Routing stability analysis with event type categorization
+- Detection of route flapping and instability
+- Identification of changes in announcing ASNs over time
 
 ### 4. Comprehensive Resource Links
 
